@@ -61,13 +61,30 @@ VALID ACTIONS (pick one):
 {"action_type": "route",      "email_id": "e001", "value": "tech_support"}
 {"action_type": "route",      "email_id": "e001", "value": "general_support"}
 {"action_type": "route",      "email_id": "e001", "value": "spam_filter"}
+{"action_type": "respond",    "email_id": "e001", "value": "billing_inquiry"}
+{"action_type": "respond",    "email_id": "e001", "value": "refund_process"}
+{"action_type": "respond",    "email_id": "e001", "value": "tech_issue_ack"}
+{"action_type": "respond",    "email_id": "e001", "value": "escalation_notice"}
+{"action_type": "respond",    "email_id": "e001", "value": "general_ack"}
 {"action_type": "archive",    "email_id": "e001", "value": "archive"}
 
+PIPELINE ORDER (strict):
+  classify  →  prioritize  →  route  →  respond
+Never prioritize/route/respond before classify. Never respond before route.
+
 RULES:
-1. Always classify an email before routing or prioritizing it.
-2. IMPORTANT: Immediately after classifying an email as spam, your NEXT action must archive it:
+1. Always classify an email before routing, prioritizing, or responding to it.
+2. Immediately after classifying an email as spam, your NEXT action must archive it:
    {"action_type": "archive", "email_id": "<same id>", "value": "archive"}
-3. Do NOT add any text before or after the JSON. Output ONLY the JSON object.
+   Never prioritize, route, or respond to spam.
+3. After an email has been routed, send a response using the correct template:
+   - category=billing    → "billing_inquiry"  (or "refund_process" if the email clearly asks for a refund/money back)
+   - category=technical  → "tech_issue_ack"   (or "escalation_notice" if it mentions outage, breach, fraud, data loss, or security incident)
+   - category=general    → "general_ack"
+   - category=spam       → do NOT respond, archive instead
+4. Do NOT respond twice to the same email. Only respond once everything upstream is done.
+5. When an email appears under "ROUTED BUT AWAITING RESPONSE", your next action for it MUST be a respond action.
+6. Do NOT add any text before or after the JSON. Output ONLY the JSON object.
 """
 
 

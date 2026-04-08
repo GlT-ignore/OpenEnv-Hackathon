@@ -46,6 +46,32 @@ client = OpenAI(api_key=HF_TOKEN, base_url=API_BASE_URL)
 # System prompt for the LLM agent
 # ---------------------------------------------------------------------------
 
+TASK_INSTRUCTIONS = {
+    "task1_easy": (
+        "This task requires ONLY: classify + archive (for spam).\n"
+        "Do NOT prioritize, route, or respond. Those actions are NOT needed.\n"
+        "IMPORTANT: As SOON as you classify an email as spam, your VERY NEXT action\n"
+        "must be archive for that same email — before moving to another email.\n"
+    ),
+    "task2_medium": (
+        "This task requires: classify → prioritize → route. NO respond. NO archive.\n"
+        "Do NOT emit respond actions — they are not needed and will be penalised.\n"
+        "Complete ALL three actions for each email before moving to the next.\n"
+        "For spam emails: classify as spam, route to spam_filter. Do not prioritize or archive.\n"
+    ),
+    "task3_hard": (
+        "This task requires: classify → prioritize → route → respond.\n"
+        "SLA RULE: Emails with sla_hours ≤ 2 are CRITICAL. Classify AND route them\n"
+        "within the first 15 steps. Always process the lowest sla_hours emails first.\n"
+        "For spam: classify as spam, route to spam_filter, then archive. Never respond to spam.\n"
+        "For non-spam: after routing, send a response with the correct template:\n"
+        "  - billing    → billing_inquiry (or refund_process if refund is requested)\n"
+        "  - technical  → tech_issue_ack  (or escalation_notice for outage/breach/fraud/security)\n"
+        "  - general    → general_ack\n"
+    ),
+}
+
+
 SYSTEM_PROMPT = """You are an email triage agent. Output ONE JSON action per turn. Nothing else.
 
 VALID ACTIONS (pick one):
@@ -226,17 +252,20 @@ def run(task_id: str = TASK_ID) -> None:
     done = False
     success = False
 
-    # Conversation history for the LLM
-    messages: List[Dict[str, str]] = [
-        {"role": "system", "content": SYSTEM_PROMPT},
-    ]
+    # Build task-specific system prompt (stateless — no growing history)
+    task_specific = TASK_INSTRUCTIONS.get(task_id, "")
+    full_system = SYSTEM_PROMPT + "\n\nTASK-SPECIFIC INSTRUCTIONS:\n" + task_specific
 
     while not done:
         step_n += 1
 
-        # Build prompt
+        # Build a FRESH 2-message prompt each turn (system + current observation).
+        # This keeps token usage flat instead of growing quadratically.
         user_content = build_user_prompt(observation, task_description)
-        messages.append({"role": "user", "content": user_content})
+        messages: List[Dict[str, str]] = [
+            {"role": "system", "content": full_system},
+            {"role": "user", "content": user_content},
+        ]
 
         # Query LLM
         try:
@@ -259,8 +288,6 @@ def run(task_id: str = TASK_ID) -> None:
                 f"reward=0.00 done=false error={str(exc)}"
             )
             rewards.append(0.0)
-            # Add assistant turn for history
-            messages.append({"role": "assistant", "content": json.dumps(action)})
             continue
 
         reward = result.get("reward", 0.0)
@@ -281,9 +308,6 @@ def run(task_id: str = TASK_ID) -> None:
             f"[STEP] step={step_n} action={action_str} "
             f"reward={reward:.2f} done={done_str} error={error}"
         )
-
-        # Add to conversation history
-        messages.append({"role": "assistant", "content": json.dumps(action)})
 
         if done:
             break

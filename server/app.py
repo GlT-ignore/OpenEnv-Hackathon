@@ -11,10 +11,9 @@ Endpoints:
 
 from __future__ import annotations
 
-import os
+import json
 from typing import Any, Dict, Optional
 
-import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -39,11 +38,6 @@ app.add_middleware(
 env = EmailTriageEnvironment()
 
 
-# ---------------------------------------------------------------------------
-# Request / response schemas
-# ---------------------------------------------------------------------------
-
-
 class ResetRequest(BaseModel):
     task_id: Optional[str] = "task1_easy"
 
@@ -52,11 +46,6 @@ class StepRequest(BaseModel):
     action_type: str
     email_id: str
     value: str
-
-
-# ---------------------------------------------------------------------------
-# Routes
-# ---------------------------------------------------------------------------
 
 
 @app.get("/health")
@@ -69,15 +58,12 @@ async def reset(request: Request) -> Dict[str, Any]:
     """Reset environment and return initial observation.
 
     Accepts an optional JSON body with `task_id`. If the body is missing,
-    empty, or does not contain `task_id`, defaults to `task1_easy`. This
-    tolerance is required for hackathon validators that probe /reset with
-    no body.
+    empty, or does not contain `task_id`, defaults to `task1_easy`.
     """
     task_id = "task1_easy"
     try:
         raw = await request.body()
         if raw:
-            import json
             try:
                 data = json.loads(raw)
                 if isinstance(data, dict) and data.get("task_id"):
@@ -140,12 +126,3 @@ def grade() -> Dict[str, Any]:
         "details": result["details"],
         "done": env.state()["done"],
     }
-
-
-# ---------------------------------------------------------------------------
-# Entry point
-# ---------------------------------------------------------------------------
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 7860))
-    uvicorn.run("server:app", host="0.0.0.0", port=port, reload=False)

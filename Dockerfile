@@ -23,7 +23,7 @@ RUN pip install --no-cache-dir --upgrade pip \
 COPY env/        ./env/
 COPY tasks/      ./tasks/
 COPY graders/    ./graders/
-COPY server.py   .
+COPY server/     ./server/
 COPY openenv.yaml .
 
 # Ownership
@@ -40,4 +40,4 @@ ENV PYTHONDONTWRITEBYTECODE=1
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:${PORT}/health || exit 1
 
-CMD ["python", "-m", "uvicorn", "server:app", "--host", "0.0.0.0", "--port", "7860", "--workers", "1"]
+CMD ["python", "-m", "uvicorn", "server.app:app", "--host", "0.0.0.0", "--port", "7860", "--workers", "1"]

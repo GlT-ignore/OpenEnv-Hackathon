@@ -30,8 +30,9 @@ from openai import OpenAI
 
 API_BASE_URL: str = os.environ.get("API_BASE_URL", "https://api.openai.com/v1")
 MODEL_NAME: str = os.environ.get("MODEL_NAME", "gpt-4o")
-HF_TOKEN: str = os.environ.get("HF_TOKEN", "")
-ENV_SERVER_URL: str = os.environ.get("ENV_SERVER_URL", "http://localhost:8000")
+HF_TOKEN: str = os.getenv("HF_TOKEN")  # type: ignore[assignment]
+LOCAL_IMAGE_NAME: str = os.getenv("LOCAL_IMAGE_NAME")  # type: ignore[assignment]
+ENV_SERVER_URL: str = os.environ.get("ENV_SERVER_URL", "http://localhost:7860")
 TASK_ID: str = os.environ.get("TASK_ID", "task1_easy")
 ENV_NAME: str = "email_triage"
 

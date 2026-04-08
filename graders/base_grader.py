@@ -14,8 +14,13 @@ class BaseGrader(ABC):
     """
     Deterministic grader that scores an episode trajectory.
     Input : list of Email objects (with agent-assigned fields) + trajectory
-    Output: float in [0.0, 1.0]
+    Output: float strictly in (0.0, 1.0) — never exactly 0 or 1
     """
+
+    # Score is reshaped to the open interval (EPS, 1 - EPS) so that no
+    # degenerate run can produce a score at the boundary. This is required
+    # by the hackathon validator, which asserts 0 < score < 1.
+    SCORE_EPS: float = 0.001
 
     @abstractmethod
     def grade(
@@ -26,10 +31,17 @@ class BaseGrader(ABC):
     ) -> Dict[str, Any]:
         """
         Returns a dict with at minimum:
-          score  : float [0.0, 1.0]
+          score  : float strictly in (0.0, 1.0)
           details: dict  (breakdown of sub-scores)
         """
         ...
+
+    @classmethod
+    def _finalize_score(cls, raw: float) -> float:
+        """Clamp a raw score into the strict open interval (EPS, 1 - EPS)."""
+        raw = max(0.0, min(1.0, raw))
+        reshaped = cls.SCORE_EPS + (1.0 - 2.0 * cls.SCORE_EPS) * raw
+        return round(reshaped, 4)
 
     # ------------------------------------------------------------------
     # Shared utilities

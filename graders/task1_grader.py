@@ -29,8 +29,8 @@ class Task1Grader(BaseGrader):
         else:
             spam_archive_rate = 1.0
 
-        score = 0.80 * classify_acc + 0.20 * spam_archive_rate
-        score = round(min(max(score, 0.0), 1.0), 4)
+        raw_score = 0.80 * classify_acc + 0.20 * spam_archive_rate
+        score = self._finalize_score(raw_score)
 
         return {
             "score": score,

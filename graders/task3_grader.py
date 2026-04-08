@@ -33,14 +33,14 @@ class Task3Grader(BaseGrader):
         response_acc = self._detailed_response_accuracy(emails, trajectory)
         sla_score = self._sla_compliance(emails, trajectory)
 
-        score = (
+        raw_score = (
             0.20 * classify_acc
             + 0.15 * priority_acc
             + 0.15 * routing_acc
             + 0.30 * response_acc
             + 0.20 * sla_score
         )
-        score = round(min(max(score, 0.0), 1.0), 4)
+        score = self._finalize_score(raw_score)
 
         return {
             "score": score,

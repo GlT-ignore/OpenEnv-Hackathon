@@ -25,18 +25,19 @@ class Task2Grader(BaseGrader):
         priority_acc = self._priority_accuracy(emails)
         routing_acc = self._routing_accuracy(emails)
 
-        score = (
+        raw_score = (
             0.40 * classify_acc
             + 0.30 * priority_acc
             + 0.30 * routing_acc
         )
-        score = round(min(max(score, 0.0), 1.0), 4)
 
         # Efficiency bonus: if completed in fewer steps than 80% of max_steps
         max_steps = 60
-        if step_count <= int(0.80 * max_steps) and score > 0.8:
+        if step_count <= int(0.80 * max_steps) and raw_score > 0.8:
             efficiency_bonus = 0.05 * (1 - step_count / max_steps)
-            score = round(min(score + efficiency_bonus, 1.0), 4)
+            raw_score = min(raw_score + efficiency_bonus, 1.0)
+
+        score = self._finalize_score(raw_score)
 
         return {
             "score": score,

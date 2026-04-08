@@ -12,10 +12,10 @@ Endpoints:
 from __future__ import annotations
 
 import os
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -45,7 +45,7 @@ env = EmailTriageEnvironment()
 
 
 class ResetRequest(BaseModel):
-    task_id: str = "task1_easy"
+    task_id: Optional[str] = "task1_easy"
 
 
 class StepRequest(BaseModel):
@@ -65,10 +65,30 @@ def health() -> Dict[str, str]:
 
 
 @app.post("/reset")
-def reset(req: ResetRequest) -> Dict[str, Any]:
-    """Reset environment and return initial observation."""
+async def reset(request: Request) -> Dict[str, Any]:
+    """Reset environment and return initial observation.
+
+    Accepts an optional JSON body with `task_id`. If the body is missing,
+    empty, or does not contain `task_id`, defaults to `task1_easy`. This
+    tolerance is required for hackathon validators that probe /reset with
+    no body.
+    """
+    task_id = "task1_easy"
     try:
-        result = env.reset(req.task_id)
+        raw = await request.body()
+        if raw:
+            import json
+            try:
+                data = json.loads(raw)
+                if isinstance(data, dict) and data.get("task_id"):
+                    task_id = data["task_id"]
+            except json.JSONDecodeError:
+                pass
+    except Exception:
+        pass
+
+    try:
+        result = env.reset(task_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     return result

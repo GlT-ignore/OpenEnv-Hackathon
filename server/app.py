@@ -12,8 +12,10 @@ Endpoints:
 from __future__ import annotations
 
 import json
+import os
 from typing import Any, Dict, Optional
 
+import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -126,3 +128,13 @@ def grade() -> Dict[str, Any]:
         "details": result["details"],
         "done": env.state()["done"],
     }
+
+
+def main() -> None:
+    """Entry point for `python -m server.app` and pyproject scripts."""
+    port = int(os.environ.get("PORT", 7860))
+    uvicorn.run("server.app:app", host="0.0.0.0", port=port, reload=False)
+
+
+if __name__ == "__main__":
+    main()

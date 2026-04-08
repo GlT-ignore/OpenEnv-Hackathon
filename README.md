@@ -54,7 +54,10 @@ email_triage_env/
 │   ├── task1_grader.py  # Macro classification accuracy + spam archive rate
 │   ├── task2_grader.py  # Weighted F1 across classify/prioritize/route
 │   └── task3_grader.py  # Composite: accuracy + response quality + SLA
-├── server.py            # FastAPI server: /reset /step /state /grade /health
+├── server/
+│   ├── __init__.py
+│   ├── __main__.py
+│   └── app.py           # FastAPI server: /reset /step /state /grade /health
 ├── inference.py         # OpenAI-compatible agent loop (strict log format)
 ├── openenv.yaml         # Environment metadata
 ├── Dockerfile
@@ -204,29 +207,29 @@ pip install -r requirements.txt
 ### 2. Start the environment server
 
 ```bash
-python server.py
+python -m server
 # or
-uvicorn server:app --host 0.0.0.0 --port 8000 --reload
+uvicorn server.app:app --host 0.0.0.0 --port 7860 --reload
 ```
 
 ### 3. Test the API manually
 
 ```bash
 # Reset to task 1
-curl -X POST http://localhost:8000/reset \
+curl -X POST http://localhost:7860/reset \
   -H "Content-Type: application/json" \
   -d '{"task_id": "task1_easy"}'
 
 # Classify email e001 as billing
-curl -X POST http://localhost:8000/step \
+curl -X POST http://localhost:7860/step \
   -H "Content-Type: application/json" \
   -d '{"action_type": "classify", "email_id": "e001", "value": "billing"}'
 
 # Check current state
-curl http://localhost:8000/state
+curl http://localhost:7860/state
 
 # Get final score
-curl http://localhost:8000/grade
+curl http://localhost:7860/grade
 ```
 
 ### 4. Run the LLM inference agent
@@ -259,13 +262,13 @@ Expected output:
 
 ```bash
 docker build -t email-triage-env .
-docker run -p 8000:8000 email-triage-env
+docker run -p 7860:7860 email-triage-env
 ```
 
 ### With environment variables for inference
 
 ```bash
-docker run -p 8000:8000 \
+docker run -p 7860:7860 \
   -e API_BASE_URL="https://api.openai.com/v1" \
   -e MODEL_NAME="gpt-4o" \
   -e HF_TOKEN="sk-..." \
@@ -282,15 +285,27 @@ docker run -p 8000:8000 \
    - `HF_TOKEN` — your API key
    - `API_BASE_URL` — model endpoint
    - `MODEL_NAME` — model name
-4. The Space exposes the environment server on port 7860 (HF default).
-   Update `ENV_SERVER_URL` in `inference.py` accordingly.
+4. The Space exposes the environment server on port 7860 (HF default —
+   matches the local default in `inference.py`, no override required).
+
+---
+
+## Tests
+
+```bash
+python -m unittest tests.test_environment -v
+```
+
+11 smoke tests cover the OpenEnv contract (reset/step/state), reward shaping
+(correct vs ordering-violation vs invalid-id), and grader properties
+(determinism, output range, perfect-run upper bound).
 
 ---
 
 ## OpenEnv Validation
 
 ```bash
-openenv validate --env email_triage --server http://localhost:8000
+openenv validate --env email_triage --server http://localhost:7860
 ```
 
 The server passes validation by:

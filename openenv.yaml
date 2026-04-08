@@ -1,0 +1,141 @@
+name: email_triage
+version: "1.0.0"
+description: >
+  A production-quality email triage RL environment that simulates
+  a real-world support inbox. The agent must classify, prioritize,
+  route, and respond to incoming emails — the same task performed
+  by millions of support engineers every day.
+
+author: Dhruva
+license: MIT
+
+environment:
+  type: text
+  stateful: true
+  deterministic: true
+  max_episode_steps:
+    task1_easy: 25
+    task2_medium: 60
+    task3_hard: 100
+
+observation_schema:
+  type: object
+  properties:
+    emails:
+      type: array
+      items:
+        type: object
+        properties:
+          id:           { type: string }
+          subject:      { type: string }
+          body:         { type: string }
+          sender:       { type: string }
+          timestamp:    { type: string, format: date-time }
+          sla_hours:    { type: integer, description: "Hours until SLA breach" }
+          category:     { type: string, nullable: true, enum: [billing, technical, general, spam, null] }
+          priority:     { type: string, nullable: true, enum: [critical, high, medium, low, null] }
+          assigned_to:  { type: string, nullable: true }
+          responded:    { type: boolean }
+          archived:     { type: boolean }
+    step_count:       { type: integer }
+    pending_count:    { type: integer }
+    processed_count:  { type: integer }
+    task_id:          { type: string }
+
+action_schema:
+  type: object
+  required: [action_type, email_id, value]
+  properties:
+    action_type:
+      type: string
+      enum: [classify, prioritize, route, respond, archive]
+    email_id:
+      type: string
+      description: "Email identifier, e.g. 'e001'"
+    value:
+      type: string
+      description: >
+        Depends on action_type:
+          classify   → billing | technical | general | spam
+          prioritize → critical | high | medium | low
+          route      → billing_team | tech_support | general_support | spam_filter
+          respond    → billing_inquiry | refund_process | tech_issue_ack | escalation_notice | general_ack
+          archive    → archive
+
+reward:
+  type: float
+  range: [-0.06, 0.10]
+  description: >
+    Step-level shaped reward.
+    Correct action yields positive reward; incorrect or duplicate action yields negative reward.
+    Final score (0.0–1.0) computed deterministically by task grader.
+
+tasks:
+  - id: task1_easy
+    name: "Email Classification"
+    difficulty: easy
+    description: >
+      Classify 10 support emails into the correct category: billing,
+      technical, general, or spam. Archive spam emails.
+    email_count: 10
+    required_actions: [classify]
+    max_steps: 25
+    scoring:
+      classify_accuracy: 0.80
+      spam_archive_rate: 0.20
+
+  - id: task2_medium
+    name: "Email Triage Pipeline"
+    difficulty: medium
+    description: >
+      For 15 emails: classify, assign priority, and route to the correct
+      support team. Must classify before prioritizing or routing.
+    email_count: 15
+    required_actions: [classify, prioritize, route]
+    max_steps: 60
+    scoring:
+      classify_accuracy: 0.40
+      priority_accuracy: 0.30
+      routing_accuracy: 0.30
+
+  - id: task3_hard
+    name: "SLA-Compliant Email Management"
+    difficulty: hard
+    description: >
+      Full triage of 20 emails with SLA constraints. Critical emails
+      (sla_hours ≤ 2) must be fully processed within the first 15 steps.
+      Respond to emails requiring a reply using the correct template.
+    email_count: 20
+    required_actions: [classify, prioritize, route, respond]
+    max_steps: 100
+    sla_critical_hours: 2
+    sla_window_steps: 15
+    scoring:
+      classify_accuracy: 0.20
+      priority_accuracy: 0.15
+      routing_accuracy: 0.15
+      response_accuracy: 0.30
+      sla_compliance: 0.20
+
+endpoints:
+  reset:
+    method: POST
+    path: /reset
+    body:
+      task_id: string
+  step:
+    method: POST
+    path: /step
+    body:
+      action_type: string
+      email_id: string
+      value: string
+  state:
+    method: GET
+    path: /state
+  grade:
+    method: GET
+    path: /grade
+  health:
+    method: GET
+    path: /health
